@@ -83,11 +83,21 @@ int main()
 	//cout << b << endl;
 	//cout << g << endl;
 	
-	vector<vector<double>> dataMat = LoadDataSet("testdata.txt");
+	/*vector<vector<double>> dataMat = LoadDataSet("complexStructure.txt");
 	vector<int> labels;
-	labels = kMeans(dataMat, 4, 1);
+	labels = kMeans(dataMat, 3, 5);
+	FILE *fp;
+	errno_t err;
+	if (err = fopen_s(&fp, "labels.txt", "w"))
+	{
+		printf("timeFile error value: %d", err);
+		exit(1);
+	}
 	for (int i = 0; i < labels.size(); ++i)
-		cout << labels[i] << endl;
+	{
+			fprintf(fp, "%d\n", labels[i]);
+	}
+	fclose(fp);*/
 
 	/*vector<pair<double, pair<int, int>>> a(8);
 	a[0] = make_pair(0.3, make_pair(0, 1));
@@ -104,44 +114,44 @@ int main()
 	for (int i = 0; i < a.size(); ++i)
 		cout << a[i].second.first << "\t" << a[i].second.second << "\t" << a[i].first << endl;*/
 
-	//int kNearestNeighborNum, sharedNearestNeighborNum, clusterNum;
-	//clock_t t1, t2, t3, t4;
-	//string fileName;
-	//vector<vector<double>> dataMat;
-	//SparseMatrix<int> knnGraph;
-	//SparseMatrix<int> L;
-	//SparseMatrix<double> distGraph;
-	//vector<vector<double> > grad;
+	int kNearestNeighborNum, sharedNearestNeighborNum, clusterNum;
+	clock_t t1, t2, t3, t4;
+	string fileName;
+	vector<vector<double>> dataMat;
+	SparseMatrix<int> knnGraph;
+	SparseMatrix<int> L;
+	SparseMatrix<double> distGraph;
+	vector<vector<double> > grad;
+	vector<int> labels;
 
-	//cout << "file name(no more than 50 characters):";
-	//cin >> fileName;
-	//cout << "k-nearest neighbor:";
-	//cin >> kNearestNeighborNum;
-	//cout << "shared nearest-neighbor:";
-	//cin >> sharedNearestNeighborNum;
-	//cout << "the number of clusters:";
-	//cin >> clusterNum;
-	//dataMat = LoadDataSet(fileName);
-	//t1 = clock();
-	//knnGraph = GetknnGraph(dataMat, sharedNearestNeighborNum);
-	//t2 = clock();
-	////cout << (double)(t2 - t1) / CLOCKS_PER_SEC << endl;
-	//tie(L, distGraph) = GetSNNDistLaplacianMat(dataMat, knnGraph, kNearestNeighborNum, sharedNearestNeighborNum);
-	//grad = GetGreenFuncGrad(L, distGraph, min((int)(pow(kNearestNeighborNum, 1) * pow(clusterNum, 2)), (int)((L.nonZeros() - dataMat.size()) / 2)));
-	//FILE *fp;
-	//errno_t err;
-	//if (err = fopen_s(&fp, "grad.txt", "w"))
-	//{
-	//	printf("timeFile error value: %d", err);
-	//	exit(1);
-	//}
-	//for (int i = 0; i < grad.size(); ++i)
-	//{
-	//	for (int j = 0; j < grad[i].size(); ++j)
-	//		fprintf(fp, "%.18f\t", grad[i][j]);
-	//	fprintf(fp, "\n");
-	//}
-	//fclose(fp);
+	cout << "file name(no more than 50 characters):";
+	cin >> fileName;
+	cout << "k-nearest neighbor:";
+	cin >> kNearestNeighborNum;
+	cout << "shared nearest-neighbor:";
+	cin >> sharedNearestNeighborNum;
+	cout << "the number of clusters:";
+	cin >> clusterNum;
+	dataMat = LoadDataSet(fileName);
+	t1 = clock();
+	knnGraph = GetknnGraph(dataMat, sharedNearestNeighborNum);
+	t2 = clock();
+	//cout << (double)(t2 - t1) / CLOCKS_PER_SEC << endl;
+	tie(L, distGraph) = GetSNNDistLaplacianMat(dataMat, knnGraph, kNearestNeighborNum, sharedNearestNeighborNum);
+	grad = GetGreenFuncGrad(L, distGraph, min((int)(pow(kNearestNeighborNum, 1) * pow(clusterNum, 2)), (int)((L.nonZeros() - dataMat.size()) / 2)));
+	labels = kMeans(grad, clusterNum, 100);
+	FILE *fp;
+	errno_t err;
+	if (err = fopen_s(&fp, "labels.txt", "w"))
+	{
+		printf("timeFile error value: %d", err);
+		exit(1);
+	}
+	for (int i = 0; i < labels.size(); ++i)
+	{
+		fprintf(fp, "%d\n", labels[i]);
+	}
+	fclose(fp);
 
 	/*vector<double *> data;
 	data.resize(5);
@@ -726,55 +736,79 @@ vector<vector<double> > kMeansPlusPlusInit(const vector<vector<double> > &data, 
 
 vector<int> kMeans(const vector<vector<double> > &data, int clusterNum, int initNum)
 {
-	int rowNum = data.size(), colNum = data[0].size();
-	vector<vector<double> > centroids;
-	vector<double> totalDist(clusterNum);
+	int rowNum = data.size(), colNum = data[0].size(), threadNum = omp_get_max_threads();
 	vector<int> labels(rowNum);
-	bool clusterChange;
-	centroids = kMeansPlusPlusInit(data, clusterNum);
-	clusterChange = true;
-	while (clusterChange)
+	int iterNum = 0;
+	double inertia = DBL_MAX;
+	while (iterNum < initNum)
 	{
-		fill(totalDist.begin(), totalDist.end(), 0);
-		clusterChange = false;
-		for (int i = 0; i < rowNum; ++i)
+		vector<vector<double> > centroids;
+		centroids = kMeansPlusPlusInit(data, clusterNum);
+		bool clusterChange;
+		vector<bool> tempChang(threadNum, false);
+		clusterChange = true;
+		vector<int> tempLabels(rowNum, 0);
+		double tempInertia = 0;
+		vector<double> dataPointInertia(threadNum, 0);
+		while (clusterChange)
 		{
-			double minDist = DBL_MAX;
-			int minIndex = -1;
-			for (int j = 0; j < clusterNum; ++j)
+			fill(tempChang.begin(), tempChang.end(), false);
+			clusterChange = false;
+#pragma omp parallel for
+			for (int i = 0; i < rowNum; ++i)
 			{
-				double tempDist = 0;
-				for (int k = 0; k < colNum; ++k)
-					tempDist += pow(data[i][k] - centroids[j][k], 2);
-				if (tempDist < minDist)
+				auto id = omp_get_thread_num();
+				double minDist = DBL_MAX;
+				int minIndex = -1;
+				for (int j = 0; j < clusterNum; ++j)
 				{
-					minDist = tempDist;
-					minIndex = j;
-				}
-			}
-			if (labels[i] != minIndex)
-			{
-				clusterChange = true;
-				labels[i] = minIndex;
-			}
-		}
-		for (int i = 0; i < clusterNum; ++i)
-		{
-			int count = 0;
-			vector<double> totalData(colNum, 0);
-			for (int j = 0; j < rowNum; ++j)
-				if (labels[j] == i)
-				{
-					++count;
+					double tempDist = 0;
 					for (int k = 0; k < colNum; ++k)
-						totalData[k] += data[j][k];
+						tempDist += pow(data[i][k] - centroids[j][k], 2);
+					if (tempDist < minDist)
+					{
+						minDist = tempDist;
+						minIndex = j;
+					}
 				}
-			if (count == 0)
-				centroids[i] = (kMeansPlusPlusInit(data, 1))[0];
-			else
-				for (int j = 0; j < colNum; ++j)
-					centroids[i][j] = totalData[j] / count;
+					dataPointInertia[id] += minDist;
+				if (tempLabels[i] != minIndex)
+				{
+					tempChang[id] = true;
+					tempLabels[i] = minIndex;
+				}
+			}
+			for (int i = 0; i < clusterNum; ++i)
+			{
+				int count = 0;
+				vector<double> totalData(colNum, 0);
+				for (int j = 0; j < rowNum; ++j)
+					if (tempLabels[j] == i)
+					{
+						++count;
+						for (int k = 0; k < colNum; ++k)
+							totalData[k] += data[j][k];
+					}
+				if (count == 0)
+					centroids[i] = (kMeansPlusPlusInit(data, 1))[0];
+				else
+					for (int j = 0; j < colNum; ++j)
+						centroids[i][j] = totalData[j] / count;
+			}
+			for (int i = 0; i < threadNum; ++i)
+				if (tempChang[i])
+				{
+					clusterChange = true;
+					break;
+				}
 		}
+		tempInertia = accumulate(dataPointInertia.begin(), dataPointInertia.end(), 0.0);
+		if (tempInertia < inertia)
+		{
+			inertia = tempInertia;
+			labels = tempLabels;
+		}
+		++iterNum;
 	}
 	return labels;
 }
