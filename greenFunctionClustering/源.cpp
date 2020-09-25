@@ -2,6 +2,7 @@
 #include <queue>
 #include <vector>
 #include <time.h>
+#include<numeric>
 #include <fstream>
 #include <sstream>
 #include <stdio.h>
@@ -46,6 +47,8 @@ int getsnnNum(const SparseMatrix<int> &knnGraph, int i, int j);
 bool cmp(pair<double, pair<int, int>> a, pair<double, pair<int, int>> b);
 pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vector<vector<double>> &, const SparseMatrix<int> &, int, int);
 vector<vector<double> > GetGreenFuncGrad(const SparseMatrix<int> &, const SparseMatrix<double> &, int);
+vector<vector<double> > kMeansPlusPlusInit(const vector<vector<double> > &data, int clusterNum);
+vector<int> kMeans(const vector<vector<double> > &data, int clusterNum, int initNum);
 
 
 int main()
@@ -79,7 +82,12 @@ int main()
 	//cout << knnGraph.nonZeros() << endl;*/
 	//cout << b << endl;
 	//cout << g << endl;
-
+	
+	vector<vector<double>> dataMat = LoadDataSet("testdata.txt");
+	vector<int> labels;
+	labels = kMeans(dataMat, 4, 1);
+	for (int i = 0; i < labels.size(); ++i)
+		cout << labels[i] << endl;
 
 	/*vector<pair<double, pair<int, int>>> a(8);
 	a[0] = make_pair(0.3, make_pair(0, 1));
@@ -96,44 +104,44 @@ int main()
 	for (int i = 0; i < a.size(); ++i)
 		cout << a[i].second.first << "\t" << a[i].second.second << "\t" << a[i].first << endl;*/
 
-	int kNearestNeighborNum, sharedNearestNeighborNum, clusterNum;
-	clock_t t1, t2, t3, t4;
-	string fileName;
-	vector<vector<double>> dataMat;
-	SparseMatrix<int> knnGraph;
-	SparseMatrix<int> L;
-	SparseMatrix<double> distGraph;
-	vector<vector<double> > grad;
+	//int kNearestNeighborNum, sharedNearestNeighborNum, clusterNum;
+	//clock_t t1, t2, t3, t4;
+	//string fileName;
+	//vector<vector<double>> dataMat;
+	//SparseMatrix<int> knnGraph;
+	//SparseMatrix<int> L;
+	//SparseMatrix<double> distGraph;
+	//vector<vector<double> > grad;
 
-	cout << "file name(no more than 50 characters):";
-	cin >> fileName;
-	cout << "k-nearest neighbor:";
-	cin >> kNearestNeighborNum;
-	cout << "shared nearest-neighbor:";
-	cin >> sharedNearestNeighborNum;
-	cout << "the number of clusters:";
-	cin >> clusterNum;
-	dataMat = LoadDataSet(fileName);
-	t1 = clock();
-	knnGraph = GetknnGraph(dataMat, sharedNearestNeighborNum);
-	t2 = clock();
-	//cout << (double)(t2 - t1) / CLOCKS_PER_SEC << endl;
-	tie(L, distGraph) = GetSNNDistLaplacianMat(dataMat, knnGraph, kNearestNeighborNum, sharedNearestNeighborNum);
-	grad = GetGreenFuncGrad(L, distGraph, min((int)(pow(kNearestNeighborNum, 1) * pow(clusterNum, 2)), (int)((L.nonZeros() - dataMat.size()) / 2)));
-	FILE *fp;
-	errno_t err;
-	if (err = fopen_s(&fp, "grad.txt", "w"))
-	{
-		printf("timeFile error value: %d", err);
-		exit(1);
-	}
-	for (int i = 0; i < grad.size(); ++i)
-	{
-		for (int j = 0; j < grad[i].size(); ++j)
-			fprintf(fp, "%.18f\t", grad[i][j]);
-		fprintf(fp, "\n");
-	}
-	fclose(fp);
+	//cout << "file name(no more than 50 characters):";
+	//cin >> fileName;
+	//cout << "k-nearest neighbor:";
+	//cin >> kNearestNeighborNum;
+	//cout << "shared nearest-neighbor:";
+	//cin >> sharedNearestNeighborNum;
+	//cout << "the number of clusters:";
+	//cin >> clusterNum;
+	//dataMat = LoadDataSet(fileName);
+	//t1 = clock();
+	//knnGraph = GetknnGraph(dataMat, sharedNearestNeighborNum);
+	//t2 = clock();
+	////cout << (double)(t2 - t1) / CLOCKS_PER_SEC << endl;
+	//tie(L, distGraph) = GetSNNDistLaplacianMat(dataMat, knnGraph, kNearestNeighborNum, sharedNearestNeighborNum);
+	//grad = GetGreenFuncGrad(L, distGraph, min((int)(pow(kNearestNeighborNum, 1) * pow(clusterNum, 2)), (int)((L.nonZeros() - dataMat.size()) / 2)));
+	//FILE *fp;
+	//errno_t err;
+	//if (err = fopen_s(&fp, "grad.txt", "w"))
+	//{
+	//	printf("timeFile error value: %d", err);
+	//	exit(1);
+	//}
+	//for (int i = 0; i < grad.size(); ++i)
+	//{
+	//	for (int j = 0; j < grad[i].size(); ++j)
+	//		fprintf(fp, "%.18f\t", grad[i][j]);
+	//	fprintf(fp, "\n");
+	//}
+	//fclose(fp);
 
 	/*vector<double *> data;
 	data.resize(5);
@@ -585,7 +593,7 @@ vector<vector<double> > GetGreenFuncGrad(const SparseMatrix<int> &graphLaplacian
 	vector<int> samples;
 	while (samples.size() < sampleNum)
 	{
-		int id = rand() % dataPointNum;
+		int id = ((double)rand() / RAND_MAX) * dataPointNum;
 		if (find(samples.begin(), samples.end(), id) == samples.end())
 			samples.push_back(id);
 		else
@@ -680,7 +688,40 @@ vector<vector<double> > GetGreenFuncGrad(const SparseMatrix<int> &graphLaplacian
 
 vector<vector<double> > kMeansPlusPlusInit(const vector<vector<double> > &data, int clusterNum)
 {
-
+	vector<vector<double> > centroids(clusterNum);
+	if (clusterNum < 1)
+		return centroids;
+	int rowNum = data.size(), colNum = data[0].size(), centNum;
+	vector<double> dist(rowNum);
+	centroids[0] = data[(int)(((double)rand() / RAND_MAX) * rowNum)];
+	centNum = 1;
+	while (centNum < clusterNum)
+	{
+		fill(dist.begin(), dist.end(), DBL_MAX);
+		for(int i = 0;i<rowNum; ++i)
+			for (int j = 0; j < centNum; ++j)
+			{
+				double tempDist = 0;
+				for (int k = 0; k < colNum; ++k)
+					tempDist += pow(centroids[j][k] - data[i][k], 2);
+				if (tempDist < dist[i])
+					dist[i] = tempDist;
+			}
+		double totalDist = accumulate(dist.begin(), dist.end(), 0.0);
+		for (int i = 0; i < rowNum; ++i)
+			dist[i] /= totalDist;
+		for (int i = 1; i < rowNum; ++i)
+			dist[i] += dist[i - 1];
+		double randProb = (double)rand() / RAND_MAX;
+		for (int i = 0; i < rowNum; ++i)
+			if (randProb <= dist[i])
+			{
+				centroids[centNum] = data[i];
+				break;
+			}
+		++centNum;
+	}
+	return centroids;
 }
 
 vector<int> kMeans(const vector<vector<double> > &data, int clusterNum, int initNum)
@@ -711,7 +752,7 @@ vector<int> kMeans(const vector<vector<double> > &data, int clusterNum, int init
 					minIndex = j;
 				}
 			}
-			if (labels[i] != minDist)
+			if (labels[i] != minIndex)
 			{
 				clusterChange = true;
 				labels[i] = minIndex;
@@ -721,7 +762,7 @@ vector<int> kMeans(const vector<vector<double> > &data, int clusterNum, int init
 		{
 			int count = 0;
 			vector<double> totalData(colNum, 0);
-			for(int j = 0;j<rowNum;++j)
+			for (int j = 0; j < rowNum; ++j)
 				if (labels[j] == i)
 				{
 					++count;
@@ -731,7 +772,8 @@ vector<int> kMeans(const vector<vector<double> > &data, int clusterNum, int init
 			if (count == 0)
 				centroids[i] = (kMeansPlusPlusInit(data, 1))[0];
 			else
-				centroids[i] = totalData;
+				for (int j = 0; j < colNum; ++j)
+					centroids[i][j] = totalData[j] / count;
 		}
 	}
 	return labels;
