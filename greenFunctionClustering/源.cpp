@@ -40,6 +40,8 @@ int KDTreePoint::DIM = 3;
 vector<vector<double>> LoadDataSet(string fileName);
 SparseMatrix<int> GetknnGraphKDTree(const vector<vector<double>> &dataMat, int kNearestNeighborNum);
 SparseMatrix<int> GetknnGraph(const vector<vector<double>> &dataMat, int kNearestNeighborNum);
+SparseMatrix<int> GetknnGraph(const vector<vector<double>> &dataMat, int kNearestNeighborNum, const vector<int> &samples);
+vector<vector<pair<unsigned int, unsigned short>>> GetknnGraph_(const vector<vector<double>> &, int);
 void ConstructHeap(vector<pair<double, int>> &a, int n, pair<double, int> value);
 void UpdataHeap(vector<pair<double, int>> &a);
 vector<int> argTopK(vector<double> arr, int k);
@@ -114,44 +116,82 @@ int main()
 	for (int i = 0; i < a.size(); ++i)
 		cout << a[i].second.first << "\t" << a[i].second.second << "\t" << a[i].first << endl;*/
 
-	int kNearestNeighborNum, sharedNearestNeighborNum, clusterNum;
-	clock_t t1, t2, t3, t4;
-	string fileName;
-	vector<vector<double>> dataMat;
-	SparseMatrix<int> knnGraph;
-	SparseMatrix<int> L;
-	SparseMatrix<double> distGraph;
-	vector<vector<double> > grad;
-	vector<int> labels;
+	/*int a = 5;
+	unsigned int b = a;
+	unsigned short c = 1;
+	vector<vector<pair<unsigned int, unsigned short>>> knnGraph(10000);
+	for (int i = 0; i < knnGraph.size(); ++i)
+		for (int j = 0; j < (int)i * 0.2; ++j)
+			knnGraph[i].push_back(make_pair(b, c));
+	int s = 0;
+	for (int i = 0; i < knnGraph.size(); ++i)
+		s += knnGraph[i].size();
+	cout << s << endl;*/
 
-	cout << "file name(no more than 50 characters):";
-	cin >> fileName;
-	cout << "k-nearest neighbor:";
-	cin >> kNearestNeighborNum;
-	cout << "shared nearest-neighbor:";
-	cin >> sharedNearestNeighborNum;
-	cout << "the number of clusters:";
-	cin >> clusterNum;
-	dataMat = LoadDataSet(fileName);
-	t1 = clock();
-	knnGraph = GetknnGraph(dataMat, sharedNearestNeighborNum);
-	t2 = clock();
-	//cout << (double)(t2 - t1) / CLOCKS_PER_SEC << endl;
-	tie(L, distGraph) = GetSNNDistLaplacianMat(dataMat, knnGraph, kNearestNeighborNum, sharedNearestNeighborNum);
-	grad = GetGreenFuncGrad(L, distGraph, min((int)(pow(kNearestNeighborNum, 1) * pow(clusterNum, 2)), (int)((L.nonZeros() - dataMat.size()) / 2)));
-	labels = kMeans(grad, clusterNum, 100);
-	FILE *fp;
-	errno_t err;
-	if (err = fopen_s(&fp, "labels.txt", "w"))
-	{
-		printf("timeFile error value: %d", err);
-		exit(1);
-	}
-	for (int i = 0; i < labels.size(); ++i)
-	{
-		fprintf(fp, "%d\n", labels[i]);
-	}
-	fclose(fp);
+	/*vector<vector<double>> dataMat;
+	dataMat = LoadDataSet("reuters10kData.txt");
+	vector<vector<pair<unsigned int, unsigned short>>> knnGraph;
+	knnGraph = GetknnGraph_(dataMat, 1000);*/
+	/*int s = 0;
+	vector<int> len(100, 0);
+	for (int i = 0; i < knnGraph.size(); ++i)
+		for (int j = 0; j < knnGraph[i].size(); ++j)
+			if (knnGraph[i][j].second < 100)
+				++len[knnGraph[i][j].second];
+	cout << len[0] << endl;
+	cout << len[1] << endl;
+	cout << len[2] << endl;
+	cout << len[3] << endl;*/
+	/*SparseMatrix<int> knnGraph;
+	knnGraph = GetknnGraph(dataMat, 1000);
+	cout << knnGraph.nonZeros() << endl;*/
+	
+	//int kNearestNeighborNum, sharedNearestNeighborNum, clusterNum;
+	//clock_t t1, t2, t3, t4;
+	//string fileName;
+	//vector<vector<double>> dataMat;
+	//SparseMatrix<int> knnGraph;
+	//SparseMatrix<int> L;
+	//SparseMatrix<double> distGraph;
+	//vector<vector<double> > grad;
+	//vector<int> labels;
+	//srand((unsigned int)time(NULL));
+
+	//cout << "file name(no more than 50 characters):";
+	//cin >> fileName;
+	//cout << "k-nearest neighbor:";
+	//cin >> kNearestNeighborNum;
+	//cout << "shared nearest-neighbor:";
+	//cin >> sharedNearestNeighborNum;
+	//cout << "the number of clusters:";
+	//cin >> clusterNum;
+	//dataMat = LoadDataSet(fileName);
+	////t1 = clock();
+	//vector<int> samples;
+	//while (samples.size() < 10000)
+	//{
+	//	int id = int(((double)rand() / RAND_MAX)*dataMat.size());
+	//	if (find(samples.begin(), samples.end(), id) == samples.end())
+	//		samples.push_back(id);
+	//}
+	//knnGraph = GetknnGraph(dataMat, sharedNearestNeighborNum, samples);
+	////t2 = clock();
+	////cout << (double)(t2 - t1) / CLOCKS_PER_SEC << endl;
+	//tie(L, distGraph) = GetSNNDistLaplacianMat(dataMat, knnGraph, kNearestNeighborNum, sharedNearestNeighborNum);
+	//grad = GetGreenFuncGrad(L, distGraph, min((int)(pow(kNearestNeighborNum, 1) * pow(clusterNum, 2)), (int)((L.nonZeros() - dataMat.size()) / 2)));
+	//labels = kMeans(grad, clusterNum, 100);
+	//FILE *fp;
+	//errno_t err;
+	//if (err = fopen_s(&fp, "labels.txt", "w"))
+	//{
+	//	printf("timeFile error value: %d", err);
+	//	exit(1);
+	//}
+	//for (int i = 0; i < labels.size(); ++i)
+	//{
+	//	fprintf(fp, "%d\n", labels[i]);
+	//}
+	//fclose(fp);
 
 	/*vector<double *> data;
 	data.resize(5);
@@ -207,6 +247,7 @@ int main()
 		cout << ids[i] << endl;
 	}
 	cout << typeid(data0).name();*/
+	getchar();
 	return 0;
 }
 
@@ -264,6 +305,88 @@ SparseMatrix<int> GetknnGraph(const vector<vector<double>> &dataMat, int kNeares
 	knnGraph.setFromTriplets(coefficients.begin(), coefficients.end());
 	knnGraph.diagonal() = VectorXi::Constant(dataPointNum, 0);
 	knnGraph.prune(1, 0);
+	return knnGraph;
+}
+
+SparseMatrix<int> GetknnGraph(const vector<vector<double>> &dataMat, int kNearestNeighborNum, const vector<int> &samples)
+{
+	int dataPointNum = dataMat.size(), dataDimension = dataMat[0].size(), sampleNum = samples.size();
+	vector<Triplet<int>> coefficients;
+	vector<vector<Triplet<int> > > buffers;
+	SparseMatrix<int> knnGraph(sampleNum, dataPointNum);
+	int threadNum = omp_get_max_threads();
+	buffers.resize(threadNum);
+	cout << "knnGraph" << endl;
+#pragma omp parallel for
+	for (int i = 0; i < dataPointNum; ++i)
+	{
+		if (i % 200 == 0)
+			cout << i << endl;
+		auto id = omp_get_thread_num();
+		vector<double> distI(sampleNum, 0);
+		vector<int> index(kNearestNeighborNum + 1);
+		for (int j = 0; j < sampleNum; ++j)
+		{
+			for (int k = 0; k < dataDimension; ++k)
+				distI[j] += pow(dataMat[i][k] - dataMat[samples[j]][k], 2);
+		}
+		index = argTopK(distI, kNearestNeighborNum + 1);
+		for (int j = 0; j <= kNearestNeighborNum; ++j)
+			buffers[id].push_back(Triplet<int>(index[j], i, 1));
+	}
+
+	for (auto & buffer : buffers)
+	{
+		move(buffer.begin(), buffer.end(), back_inserter(coefficients));
+	}
+	knnGraph.setFromTriplets(coefficients.begin(), coefficients.end());
+	//knnGraph.diagonal() = VectorXi::Constant(dataPointNum, 0);
+	knnGraph.prune(1, 0);
+	return knnGraph;
+}
+
+vector<vector<pair<unsigned int, unsigned short>>> GetknnGraph_(const vector<vector<double>> &dataMat, int kNearestNeighborNum)
+{
+	int dataPointNum = dataMat.size(), dataDimension = dataMat[0].size();
+	vector<vector<pair<unsigned int, unsigned short>>> knnGraph(dataPointNum);
+	cout << "knnGraph" << endl;
+#pragma omp parallel for
+	for (int i = 0; i < dataPointNum; ++i)
+	{
+		if (i % 500 == 0)
+			cout << i << endl;
+		vector<double> distI(dataPointNum, 0);
+		vector<int> index(kNearestNeighborNum + 1);
+		for (int j = 0; j < dataPointNum; ++j)
+		{
+			for (int k = 0; k < dataDimension; ++k)
+				distI[j] += pow(dataMat[i][k] - dataMat[j][k], 2);
+		}
+		index = argTopK(distI, kNearestNeighborNum + 1);
+		sort(index.begin(), index.end());
+		for (vector<int>::iterator it = index.begin(); it != index.end();)
+			if (*it == i)
+			{
+				it = index.erase(it);
+				break;
+			}
+			else
+				++it;
+		unsigned short count = 1;
+		unsigned int start = index[0];
+		for (int j = 1; j < index.size(); ++j)
+		{
+			if (index[j - 1] + 1 == index[j])
+				++count;
+			else
+			{
+				knnGraph[i].push_back(make_pair(start, count));
+				start = index[j];
+				count = 1;
+			}
+		}
+		knnGraph[i].push_back(make_pair(start, count));
+	}
 	return knnGraph;
 }
 
@@ -418,6 +541,8 @@ pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vecto
 #pragma omp parallel for
 	for (int i = 0; i < dataPointNum; ++i)
 	{
+		if (i % 200 == 0)
+			cout << i << endl;
 		auto threadID = omp_get_thread_num();
 		for (int j = 0; j < dataPointNum; ++j)
 		{
@@ -477,17 +602,21 @@ pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vecto
 		}
 		++connectedComponentNum;
 	}
+	cout << connectedComponentNum << endl;
 	if (connectedComponentNum > 1)
 	{
 		vector<int> connectedComponentIndex(connectedComponentNum, 0);
 		vector<vector<int>> componentPointIndex(connectedComponentNum);
 		for (int i = 0; i < dataPointNum; ++i)
 			componentPointIndex[connectedComponentIndexOfData[i]].push_back(i);
-		vector<pair<double, pair<int, int>>> distBetweenConnectedComponents(connectedComponentNum * (connectedComponentNum - 1) / 2);
+		long long distBetweenConnectedComponentsNum = (long long)connectedComponentNum* (connectedComponentNum - 1) / 2;
+		vector<pair<double, pair<int, int>>> distBetweenConnectedComponents(distBetweenConnectedComponentsNum);
 		cout << "L2" << endl;
-#pragma omp parallel for schedule(dynamic, 8)
+#pragma omp parallel for schedule(dynamic, 32)
 		for (int i = 0; i < connectedComponentNum; ++i)
 		{
+			if (i % 200 == 0)
+				cout << i << endl;
 			connectedComponentIndex[i] = i;
 			for (int j = i + 1; j < connectedComponentNum; ++j)
 			{
@@ -665,6 +794,8 @@ vector<vector<double> > GetGreenFuncGrad(const SparseMatrix<int> &graphLaplacian
 #pragma omp parallel for
 	for (int i = 0; i < dataPointNum; ++i)
 	{
+		if (i % 200 == 0)
+			cout << i << endl;
 		int count = 0;
 		auto id = omp_get_thread_num();
 		VectorXd b(dataPointNum);

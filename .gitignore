@@ -450,3 +450,5 @@ __pycache__/
 /greenFunctionClustering/reuters10kData.txt
 /greenFunctionClustering/reuters100kLabels.txt
 /greenFunctionClustering/reuters100kData.txt
+/greenFunctionClustering/reuters50kData.txt
+/greenFunctionClustering/reuters50kLabels.txt
