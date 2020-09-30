@@ -301,6 +301,8 @@ SparseMatrix<int> GetknnGraph(const vector<vector<double>> &dataMat, int kNeares
 	for (auto & buffer : buffers)
 	{
 		move(buffer.begin(), buffer.end(), back_inserter(coefficients));
+		buffer.clear();
+		vector<Triplet<int> >().swap(buffer);
 	}
 	knnGraph.setFromTriplets(coefficients.begin(), coefficients.end());
 	knnGraph.diagonal() = VectorXi::Constant(dataPointNum, 0);
@@ -338,6 +340,8 @@ SparseMatrix<int> GetknnGraph(const vector<vector<double>> &dataMat, int kNeares
 	for (auto & buffer : buffers)
 	{
 		move(buffer.begin(), buffer.end(), back_inserter(coefficients));
+		buffer.clear();
+		vector<Triplet<int> >().swap(buffer);
 	}
 	knnGraph.setFromTriplets(coefficients.begin(), coefficients.end());
 	//knnGraph.diagonal() = VectorXi::Constant(dataPointNum, 0);
@@ -420,6 +424,8 @@ SparseMatrix<int> GetknnGraphKDTree(const vector<vector<double>> &dataMat, int k
 	for (auto & buffer : buffers)
 	{
 		move(buffer.begin(), buffer.end(), back_inserter(coefficients));
+		buffer.clear();
+		vector<Triplet<int> >().swap(buffer);
 	}
 	knnGraph.setFromTriplets(coefficients.begin(), coefficients.end());
 	knnGraph.diagonal() = VectorXi::Constant(dataPointNum, 0);
@@ -532,10 +538,13 @@ pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vecto
 	//mutual knn graph
 	vector<vector<double> > dist(threadNum);
 	vector<vector<int> > index(threadNum);
+	vector<vector<int> > index2(threadNum);
+	int knn2 = 15;
 	for (int i = 0; i < threadNum; ++i)
 	{
 		dist[i].resize(dataPointNum);
 		index[i].resize(kNearestNeighborNum + 1);
+		index2[i].resize(knn2);
 	}
 	cout << "L1" << endl;
 #pragma omp parallel for
@@ -554,6 +563,7 @@ pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vecto
 			dist[threadID][j] = 1 - (double)getsnnNum(knnGraph, i, j) / sharedNearestNeighborNum;
 		}
 		index[threadID] = argTopK(dist[threadID], kNearestNeighborNum + 1);
+		index2[threadID] = argTopK(dist[threadID], knn2);
 		for (int j = 0; j <= kNearestNeighborNum; ++j)
 		{
 			laplacianMatBuffers[threadID].push_back(Triplet<int>(i, index[threadID][j], 1));
@@ -561,14 +571,25 @@ pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vecto
 			distGraphBuffers[threadID].push_back(Triplet<double>(i, index[threadID][j], dist[threadID][index[threadID][j]]));
 			distGraphBuffers[threadID].push_back(Triplet<double>(index[threadID][j], i, dist[threadID][index[threadID][j]]));
 		}
+		for (int j = 0; j < knn2; ++j)
+		{
+			laplacianMatBuffers[threadID].push_back(Triplet<int>(i, index2[threadID][j], 1));
+			laplacianMatBuffers[threadID].push_back(Triplet<int>(index2[threadID][j], i, 1));
+			distGraphBuffers[threadID].push_back(Triplet<double>(i, index2[threadID][j], dist[threadID][index2[threadID][j]]));
+			distGraphBuffers[threadID].push_back(Triplet<double>(index2[threadID][j], i, dist[threadID][index2[threadID][j]]));
+		}
 	}
 	for (auto & buffer : laplacianMatBuffers)
 	{
 		move(buffer.begin(), buffer.end(), back_inserter(laplacianMatCoefficients));
+		buffer.clear();
+		vector<Triplet<int> >().swap(buffer);
 	}
 	for (auto & buffer : distGraphBuffers)
 	{
 		move(buffer.begin(), buffer.end(), back_inserter(distGraphCoefficients));
+		buffer.clear();
+		vector<Triplet<double> >().swap(buffer);
 	}
 	L.setFromTriplets(laplacianMatCoefficients.begin(), laplacianMatCoefficients.end());
 	distGraph.setFromTriplets(distGraphCoefficients.begin(), distGraphCoefficients.end());
@@ -593,7 +614,7 @@ pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vecto
 			int j = stack[stack.size() - 1];
 			stack.pop_back();
 			for (SparseMatrix<int>::InnerIterator it(L, j); it; ++it)
-				if (!visit[it.row()] && it.value() == 2)
+				if (!visit[it.row()] && it.value() == 4)
 				{
 					visit[it.row()] = true;
 					stack.push_back(it.row());
@@ -609,7 +630,7 @@ pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vecto
 		vector<vector<int>> componentPointIndex(connectedComponentNum);
 		for (int i = 0; i < dataPointNum; ++i)
 			componentPointIndex[connectedComponentIndexOfData[i]].push_back(i);
-		long long distBetweenConnectedComponentsNum = (long long)connectedComponentNum* (connectedComponentNum - 1) / 2;
+		/*long long distBetweenConnectedComponentsNum = (long long)connectedComponentNum* (connectedComponentNum - 1) / 2;
 		vector<pair<double, pair<int, int>>> distBetweenConnectedComponents(distBetweenConnectedComponentsNum);
 		cout << "L2" << endl;
 #pragma omp parallel for schedule(dynamic, 32)
@@ -669,7 +690,42 @@ pair<SparseMatrix<int>, SparseMatrix<double>> GetSNNDistLaplacianMat(const vecto
 				if (connectedComponentIndex[i] == mergeLabel1)
 					connectedComponentIndex[i] = mergeLabel2;
 			++interConnectedComponentEdgeNum;
+		}*/
+		/*for (int i = 0; i < connectedComponentNum; ++i)
+		{
+			connectedComponentIndex[i] = i;
 		}
+		int interConnectedComponentEdgeNum = 0;
+		int minDistIndex = 0, mergeLabel1, mergeLabel2;
+		while (interConnectedComponentEdgeNum < connectedComponentNum - 1)
+		{
+
+			int tempRow, tempCol;
+			tempRow = distBetweenConnectedComponents[minDistIndex].second.first;
+			tempCol = distBetweenConnectedComponents[minDistIndex].second.second;
+			while (connectedComponentIndex[connectedComponentIndexOfData[tempRow]]
+				== connectedComponentIndex[connectedComponentIndexOfData[tempCol]])
+			{
+				++minDistIndex;
+				tempRow = distBetweenConnectedComponents[minDistIndex].second.first;
+				tempCol = distBetweenConnectedComponents[minDistIndex].second.second;
+			}
+			if (L.coeff(tempRow, tempCol) == 2 || L.coeff(tempCol, tempRow) == 2)
+			{
+				cout << "L(" << tempRow << ", " << tempCol << ") = " << L.coeff(tempRow, tempCol) << endl;
+				exit(0);
+			}
+			L.coeffRef(tempRow, tempCol) = 2;
+			L.coeffRef(tempCol, tempRow) = 2;
+			distGraph.coeffRef(tempCol, tempRow) = 2 * distBetweenConnectedComponents[minDistIndex].first;
+			distGraph.coeffRef(tempRow, tempCol) = 2 * distBetweenConnectedComponents[minDistIndex].first;
+			mergeLabel1 = connectedComponentIndex[connectedComponentIndexOfData[tempRow]];
+			mergeLabel2 = connectedComponentIndex[connectedComponentIndexOfData[tempCol]];
+			for (int i = 0; i < connectedComponentNum; ++i)
+				if (connectedComponentIndex[i] == mergeLabel1)
+					connectedComponentIndex[i] = mergeLabel2;
+			++interConnectedComponentEdgeNum;
+		}*/
 	}
 	cout << "L3" << endl;
 	for (int i = 0; i < L.outerSize(); ++i)
